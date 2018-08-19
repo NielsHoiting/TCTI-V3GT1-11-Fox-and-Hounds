@@ -1,7 +1,87 @@
-function newBoard(fox) {
-    let grid = new Grid(8, 8);
-    grid.setFox(2);
-    grid.setHounds();
+let engine;
+function newGame() {
+    engine = new Engine(document.getElementById("fox-player").value,
+        document.getElementById("hounds-player").value,
+        document.getElementById('board'));
+}
+
+function next() {
+    if(!engine.checkWon() || engine.checkLoose()) {
+        engine.next();
+        setTimeout(next(), 100);
+    }
+}
+
+class Engine {
+    constructor (fox, hounds, board) {
+        this.grid = new Grid(8, 8);
+        this.board = new Board(board);
+        this.grid.setHounds();
+        this.grid.setFox(0);
+        this.turn = 'fox';
+        this.currentState = new State(this.grid, this.turn);
+        this.board.draw(this.currentState);
+    }
+
+    next() {
+        let state = this.currentState.getNextMove();
+        this.currentState = state;
+        this.turn = state.turn;
+        this.board.draw(this.currentState);
+    }
+
+    // Check if fox has reached endNodes;
+    checkWon() {
+        let fox = this.currentState.grid.getFox();
+        return fox.y === 0;
+    }
+
+    // Check if fox has no neighbours left
+    checkLoose() {
+        let fox = this.currentState.grid.getFox();
+        if (!this.currentState.grid.getNeighbors(fox).length) {
+            return true;
+        }
+    }
+}
+
+class Board {
+    constructor(boardElement) {
+        this.element = boardElement;
+    }
+
+    draw (state) {
+        while(this.element.firstChild){
+            this.element.removeChild(this.element.firstChild);
+        }
+
+        let grid = state.grid.getGrid();
+        let gridObject = state.grid;
+        for (let y = 0; y < gridObject.height; y++) {
+            for (let x = 0; x < gridObject.width; x++) {
+                if (grid[y][x].animal) {
+                    let animalElement = document.createElement('div');
+                    animalElement.style = 'left: ' + x * 75 + 'px; top: ' + y * 75 + 'px;';
+                    animalElement.className = grid[y][x].animal;
+                    animalElement.dataset.x = x;
+                    animalElement.dataset.y = y;
+                    animalElement.onclick = function(item) {
+                        //engine.selectAnimal()
+                        //this.selectAnimal();
+                        let x = item.path[0].dataset.x,
+                            y = item.path[0].dataset.y;
+                        selectAnimal(x, y);
+                    };
+
+                    this.element.appendChild(animalElement);
+                }
+            }
+        }
+    }
+
+    selectAnimal(x, y) {
+        console.log(state, x, y);
+    }
 }
 
 class Grid {
@@ -147,6 +227,105 @@ class Grid {
     }
 }
 
+class State {
+    // Turn is who is able to do a move after this state.
+    constructor(grid, turn) {
+        this.grid = grid;
+        this.turn = turn;
+    }
+
+    getNextMove() {
+        let possibleMoves = this.getPossibleStates();
+        let bestMove = {value: null, state: []};
+        for (let i = 0; i < possibleMoves.length; i++) {
+            //TODO: simplify
+            if (this.turn === 'hound') {
+                let value = State.getValue(possibleMoves[i], 0, 4);
+                if (!bestMove.value || value > bestMove.value) {
+                    bestMove.value = value;
+                    bestMove.state = [possibleMoves[i]];
+                }
+                if (bestMove.value === value) {
+                    bestMove.state.push(possibleMoves[i]);
+                }
+            } else {
+                let value = State.getValue(possibleMoves[i], 0, 4);
+                if (!bestMove.value || value < bestMove.value) {
+                    bestMove.value = value;
+                    bestMove.state.push(possibleMoves[i]);
+                }
+                if (bestMove.value === value) {
+                    bestMove.state.push(possibleMoves[i]);
+                }
+            }
+        }
+        return bestMove.state[Math.floor(Math.random() * bestMove.state.length)];
+    }
+
+    getPossibleStates() {
+        // get the nodes that can move this round
+        let states = [],
+            nodes = this.turn === 'fox' ? [this.grid.getFox()] : this.grid.getHounds();
+        for (let i = 0; i < nodes.length; i++) {
+            let neighbours = this.grid.getNeighbors(nodes[i]);
+            for (let j = 0; j < neighbours.length; j++) {
+                let clonedGrid = this.grid.clone();
+                clonedGrid.moveNode(nodes[i], neighbours[j]);
+                let state = new State(clonedGrid);
+                state.turn = this.turn === 'fox' ? 'hound' : 'fox';
+                states.push(state);
+            }
+        }
+        return states;
+    }
+
+    static getValue(state, depth, maxDepth) {
+        //When max depth is reached we wanna calculate the min/max value for each end state.
+        if (depth === maxDepth) {
+            // TODO: use all finish nodes for calc.
+            // TODO: check if we should give lowest or highest value back of all nodes.
+            let value = state.turn = 'hound' ? -Infinity : Infinity;
+            let endNode = state.grid.getNode(1, 0);
+
+            let path = PathFinder.aStar(state.grid.fox, endNode, state.grid);
+
+            if (path.length) {
+                return path.length;
+            } else {
+                //TODO: always infinty? or do we need -Infinity?
+                return Infinity;
+            }
+        }
+
+        // if turn is hound we wanna maximize
+        if (state.turn === 'hound') {
+            return State.getMaxValue(state, depth, maxDepth);
+        } else {
+            return State.getMinValue(state, depth, maxDepth);
+        }
+    }
+
+    static getMaxValue(state, dept, maxDepth) {
+        let possibleStates = state.getPossibleStates(state.turn);
+        let value = -Infinity;
+        for (let i = 0; i < possibleStates.length; i++) {
+            possibleStates[i].turn = state.turn === 'fox' ? 'hound' : 'fox';
+            value = Math.max(value, State.getValue(possibleStates[i], dept + 1, maxDepth));
+        }
+        return value;
+    }
+
+    static getMinValue(state, dept, maxDepth) {
+        let possibleStates = state.getPossibleStates(state.turn);
+        let value = -Infinity;
+        for (let i = 0; i < possibleStates.length; i++) {
+            possibleStates[i].turn = state.turn === 'fox' ? 'hound' : 'fox';
+            value = Math.min(value, State.getValue(possibleStates[i], dept + 1, maxDepth));
+        }
+        return value;
+    }
+}
+
 class Node {
     constructor(x, y, walkable) {
         this.x = x;
@@ -178,6 +357,10 @@ class PathFinder {
                     node = node.parent;
                     path.push(node);
                 }
+
+                if (path[0] === undefined  || (path[0].x !== endNode.x || path[0].y !== endNode.y)) {
+                    path.unshift(endNode);
+                }
                 return path;
             }
 
@@ -208,6 +391,7 @@ class PathFinder {
             openList.sort(function (a, b) {
                 return a.f - b.f
             });
+
         }
 
         function replaceOpenList(node) {
@@ -223,44 +407,7 @@ class PathFinder {
             let dy = Math.abs(startNode.y, endNode.y);
             return dx + dy;
         }
-    }
-}
 
-class State {
-    constructor(grid, turn, maxDepth, depth) {
-        this.grid = grid;
-        this.turn = turn;
-        this.heuristic = this.calculateHeuristic();
-        if (maxDepth && depth < maxDepth) {
-            this.possibleStates = this.getPossibleStates(depth, maxDepth)
-        }
-    }
-
-    calculateHeuristic() {
-        // Calculate the shortest way of the fox to the upper 4 nodes (1, 0) (3, 0), (5, 0), (7, 0)
-        // TODO: make the heuristic more advanced?
-        let h = Infinity;
-        for (let x = 1; x < 8; x += 2) {
-            let endNode = this.grid.getNode(x, 0);
-            let path = PathFinder.aStar(this.grid.fox, endNode, this.grid);
-            h = path && path.length < h ? path.length : h;
-        }
-        return h;
-    }
-
-    getPossibleStates(depth, maxDepth) {
-        // get the nodes that can move this round
-        let states = [],
-            nodes = this.turn === 'fox' ? [this.grid.getFox()] : this.grid.getHounds();
-        for (let i = 0; i < nodes.length; i++) {
-            let neighbours = this.grid.getNeighbors(nodes[i]);
-            for (let j = 0; j < neighbours.length; j++) {
-                let clonedGrid = this.grid.clone();
-                clonedGrid.moveNode(nodes[i], neighbours[j]);
-                let state = new State(clonedGrid, this.turn === 'fox' ? 'hound' : 'fox', maxDepth, depth + 1);
-                states.push(state);
-            }
-        }
-        return states;
+        return [];
     }
 }

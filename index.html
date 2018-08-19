@@ -9,7 +9,22 @@
 <body>
 	<div class="board" id="board"></div>
 	<div class="menu">
-		<button onclick="newBoard()">New game</button>
+		<section>
+			<label for="fox-player">Fox</label>
+			<select id="fox-player">
+				<option value="COMPUTER">Computer</option>
+				<option value="HUMAN">Human</option>
+			</select>
+		</section>
+		<section>
+			<label for="hounds-player">Hounds</label>
+			<select id="hounds-player">
+				<option value="COMPUTER">Computer</option>
+				<option value="HUMAN">Human</option>
+			</select>
+		</section>
+		<button onclick="newGame()">New game</button>
+		<button onclick="next()">Next</button>
 	</div>
 	<script src="game.js"></script>
 </body>
