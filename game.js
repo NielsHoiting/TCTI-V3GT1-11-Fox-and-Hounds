@@ -27,12 +27,10 @@ class Grid {
     getGrid() {
         return this.grid;
     }
-
     // Gets node for given x, y.
     getNode(x, y) {
         return this.grid[y][x];
     }
-
     // Returns list with neighbour nodes.
     getNeighbors(node) {
         let x = node.x,
@@ -73,40 +71,32 @@ class Grid {
     // Setting fox on the x coordinate, only uneven x allowed. (0, 2, 4, 6).
     setFox(x) {
         if (x % 2 === 0) {
-            let node = this.getNode(x, 7)
+            let node = this.getNode(x, 7);
             node.walkable = false;
             node.animal = 'fox';
+            this.fox = node;
         }
+    }
+    // Get the fox node.
+    getFox() {
+        return this.fox;
     }
 
     // Set hounds, hounds always start at the same coordinates.
     setHounds() {
+        this.hounds = [];
         for (let x = 1; x < 8; x += 2) {
-            let node = this.getNode(x, 0)
+            let node = this.getNode(x, 0);
             node.walkable = false;
             node.animal = 'hound';
+            this.hounds.push(node);
         }
     }
-
     // Get the hound nodes.
     getHounds() {
-        let nodes = [];
-        for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                if (this.grid[y][x].animal === 'hound') {
-                    nodes.push(this.grid[y][x]);
-                }
-            }
-        }
-        return nodes;
+        return this.hounds;
     }
 
-    // Get the fox node.
-    getFox() {
-        for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                if (this.grid[y][x].animal === 'fox') {
-                    return this.grid[y][x];
     // This function moves an animal
     moveNode(fromNode, toNode) {
         // We we will use the coordinates instead of the objects.
@@ -237,20 +227,40 @@ class PathFinder {
 }
 
 class State {
-    constructor(grid) {
+    constructor(grid, turn, maxDepth, depth) {
         this.grid = grid;
+        this.turn = turn;
         this.heuristic = this.calculateHeuristic();
+        if (maxDepth && depth < maxDepth) {
+            this.possibleStates = this.getPossibleStates(depth, maxDepth)
+        }
     }
 
     calculateHeuristic() {
         // Calculate the shortest way of the fox to the upper 4 nodes (1, 0) (3, 0), (5, 0), (7, 0)
-        let foxNode = this.grid.getFox();
+        // TODO: make the heuristic more advanced?
         let h = Infinity;
         for (let x = 1; x < 8; x += 2) {
             let endNode = this.grid.getNode(x, 0);
-            let path = PathFinder.aStar(foxNode, endNode, this.grid);
-            h = path.length < h ? path.length : h;
+            let path = PathFinder.aStar(this.grid.fox, endNode, this.grid);
+            h = path && path.length < h ? path.length : h;
         }
         return h;
+    }
+
+    getPossibleStates(depth, maxDepth) {
+        // get the nodes that can move this round
+        let states = [],
+            nodes = this.turn === 'fox' ? [this.grid.getFox()] : this.grid.getHounds();
+        for (let i = 0; i < nodes.length; i++) {
+            let neighbours = this.grid.getNeighbors(nodes[i]);
+            for (let j = 0; j < neighbours.length; j++) {
+                let clonedGrid = this.grid.clone();
+                clonedGrid.moveNode(nodes[i], neighbours[j]);
+                let state = new State(clonedGrid, this.turn === 'fox' ? 'hound' : 'fox', maxDepth, depth + 1);
+                states.push(state);
+            }
+        }
+        return states;
     }
 }
