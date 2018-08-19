@@ -1,17 +1,7 @@
-var board;
-var turn = 'hound';
-var animalHTMLElements = [];
-
 function newBoard(fox) {
     let grid = new Grid(8, 8);
-    let node = grid.getNode(3, 2);
-    node.walkable = false;
-    node = grid.getNode(5, 2);
-    node.walkable = false;
-    node = grid.getNode(7, 2);
-    node.walkable = false;
-
-    PathFinder.aStar(grid.getNode(5, 0), grid.getNode(6, 7), grid)
+    grid.setFox(2);
+    grid.setHounds();
 }
 
 class Grid {
@@ -33,6 +23,11 @@ class Grid {
         }
     }
 
+    // Returns the grid object.
+    getGrid() {
+        return this.grid;
+    }
+
     // Gets node for given x, y.
     getNode(x, y) {
         return this.grid[y][x];
@@ -45,14 +40,14 @@ class Grid {
             neighbours = [];
 
         // get left above node
-        if (x - 1 >= 0 && y -1 >= 0) {
-            let node =  this.getNode(x - 1, y - 1);
+        if (x - 1 >= 0 && y - 1 >= 0) {
+            let node = this.getNode(x - 1, y - 1);
             if (node.walkable) {
                 neighbours.push(node);
             }
         }
         // get right above node
-        if (x + 1 <= this.width - 1 && y -1 >= 0) {
+        if (x + 1 <= this.width - 1 && y - 1 >= 0) {
             let node = this.getNode(x + 1, y - 1);
             if (node.walkable) {
                 neighbours.push(node);
@@ -74,10 +69,69 @@ class Grid {
         }
         return neighbours;
     }
+
+    // Setting fox on the x coordinate, only uneven x allowed. (0, 2, 4, 6).
+    setFox(x) {
+        if (x % 2 === 0) {
+            let node = this.getNode(x, 7)
+            node.walkable = false;
+            node.animal = 'fox';
+        }
+    }
+
+    // Set hounds, hounds always start at the same coordinates.
+    setHounds() {
+        for (let x = 1; x < 8; x += 2) {
+            let node = this.getNode(x, 0)
+            node.walkable = false;
+            node.animal = 'hound';
+        }
+    }
+
+    // Get the hound nodes.
+    getHounds() {
+        let nodes = [];
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.grid[y][x].animal === 'hound') {
+                    nodes.push(this.grid[y][x]);
+                }
+            }
+        }
+        return nodes;
+    }
+
+    // Get the fox node.
+    getFox() {
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.grid[y][x].animal === 'fox') {
+                    return this.grid[y][x];
+                }
+            }
+        }
+    }
+
+    // Clone of grid.
+    clone() {
+        let width = this.width;
+        let height = this.height;
+        let grid = new Grid(width, height);
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.grid[y][x].animal === 'hound' || this.grid[y][x].animal === 'fox') {
+                    grid.getGrid()[y][x].animal = this.grid[y][x].animal;
+                }
+            }
+        }
+        return grid;
+    }
+
+
 }
 
 class Node {
-    constructor(x, y, walkable, animal) {
+    constructor(x, y, walkable) {
         this.x = x;
         this.y = y;
         this.walkable = walkable;
@@ -85,9 +139,9 @@ class Node {
 }
 
 class PathFinder {
-    static aStar (startNode, endNode, grid) {
+    static aStar(startNode, endNode, grid) {
+        let clonedGrid = grid.clone();
         let openList = [],
-            closedList = [],
             node,
             neighbours,
             i, neighbour, a, b, ng;
@@ -101,23 +155,23 @@ class PathFinder {
             node.g = 0;
             node.f = 0;
 
-            if (node === endNode) {
+            if (node.x === endNode.x && node.y === endNode.y) {
                 let path = [];
-                while(node.parent && node !== startNode) {
+                while (node.parent && node !== startNode) {
                     node = node.parent;
                     path.push(node);
                 }
                 return path;
             }
 
-            neighbours = grid.getNeighbors(node);
+            neighbours = clonedGrid.getNeighbors(node);
 
             for (i = 0; i < neighbours.length; i++) {
                 // neighbour g
                 neighbour = neighbours[i];
                 a = neighbour.x - node.x;
                 b = neighbour.y - node.y;
-                ng = node.g + Math.sqrt(a*a + b*b);
+                ng = node.g + Math.sqrt(a * a + b * b);
 
                 if (!neighbour.opened || ng < neighbour.g) {
                     neighbour.g = ng;
@@ -134,7 +188,7 @@ class PathFinder {
             }
 
             // Sorting list
-            openList.sort(function(a, b){
+            openList.sort(function (a, b) {
                 return a.f - b.f
             });
         }
@@ -152,5 +206,24 @@ class PathFinder {
             let dy = Math.abs(startNode.y, endNode.y);
             return dx + dy;
         }
+    }
+}
+
+class State {
+    constructor(grid) {
+        this.grid = grid;
+        this.heuristic = this.calculateHeuristic();
+    }
+
+    calculateHeuristic() {
+        // Calculate the shortest way of the fox to the upper 4 nodes (1, 0) (3, 0), (5, 0), (7, 0)
+        let foxNode = this.grid.getFox();
+        let h = Infinity;
+        for (let x = 1; x < 8; x += 2) {
+            let endNode = this.grid.getNode(x, 0);
+            let path = PathFinder.aStar(foxNode, endNode, this.grid);
+            h = path.length < h ? path.length : h;
+        }
+        return h;
     }
 }
