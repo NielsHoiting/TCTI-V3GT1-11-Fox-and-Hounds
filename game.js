@@ -107,9 +107,29 @@ class Grid {
             for (let x = 0; x < this.width; x++) {
                 if (this.grid[y][x].animal === 'fox') {
                     return this.grid[y][x];
+    // This function moves an animal
+    moveNode(fromNode, toNode) {
+        // We we will use the coordinates instead of the objects.
+        let x = fromNode.x,
+            y = fromNode.y,
+            animal = fromNode.animal;
+        fromNode = this.getNode(fromNode.x, fromNode.y);
+        toNode = this.getNode(toNode.x, toNode.y);
+        toNode.animal = animal;
+        toNode.walkable = false;
+        // Updating quick reference to fox or hounds
+        if (animal === 'fox') {
+            this.fox = toNode;
+        } else {
+            let hounds = this.getHounds();
+            for (let i = 0; i < hounds.length; i++) {
+                if(hounds[i].x === fromNode.x && hounds[i].y === fromNode.y) {
+                    hounds[i] = toNode;
                 }
             }
         }
+        delete fromNode.animal;
+        fromNode.walkable = true;
     }
 
     // Clone of grid.
