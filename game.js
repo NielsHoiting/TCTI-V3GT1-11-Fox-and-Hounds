@@ -134,20 +134,27 @@ class Grid {
 
     // Clone of grid.
     clone() {
-        let width = this.width;
-        let height = this.height;
-        let grid = new Grid(width, height);
-        for (let y = 0; y < this.height; y++) {
-            for (let x = 0; x < this.width; x++) {
-                if (this.grid[y][x].animal === 'hound' || this.grid[y][x].animal === 'fox') {
-                    grid.getGrid()[y][x].animal = this.grid[y][x].animal;
-                }
-            }
+        let width = this.width,
+            height = this.height,
+            gridObject = new Grid(width, height),
+            grid = gridObject.getGrid(),
+            fox = this.getFox(),
+            hounds = this.getHounds();
+
+        // setting fox and quick reference
+        grid[fox.y][fox.x].animal = 'fox';
+        grid[fox.y][fox.x].walkable = false;
+        gridObject.fox = grid[fox.y][fox.x];
+
+        // setting hounds and quick reference
+        gridObject.hounds = [];
+        for (let i = 0; i < hounds.length; i++) {
+            grid[hounds[i].y][hounds[i].x].animal = 'hound';
+            grid[hounds[i].y][hounds[i].x].walkable = false;
+            gridObject.hounds.push(grid[hounds[i].y][hounds[i].x]);
         }
-        return grid;
+        return gridObject;
     }
-
-
 }
 
 class Node {
