@@ -403,8 +403,8 @@ class PathFinder {
         }
 
         function manhattanDistance(startNode, endNode) {
-            let dx = Math.abs(startNode.x, endNode.x);
-            let dy = Math.abs(startNode.y, endNode.y);
+            let dx = Math.abs(startNode.x - endNode.x);
+            let dy = Math.abs(startNode.y - endNode.y);
             return dx + dy;
         }
 
