@@ -2,41 +2,73 @@ let engine;
 function newGame() {
     engine = new Engine(document.getElementById("fox-player").value,
         document.getElementById("hounds-player").value,
-        document.getElementById('board'));
+        document.getElementById('board'),
+        document.getElementById('menu'));
 }
 
-function next() {
-    if(!engine.checkWon() || engine.checkLoose()) {
-        engine.next();
-    }
+function stop() {
+    engine.game = 'STOPPED';
+    let currentState = engine.currentState;
+    engine.currentState.grid = new Grid(8,8);
+    engine.board.draw(currentState);
 }
 
 class Engine {
-    constructor (fox, hounds, board) {
+    constructor (fox, hound, board, menu) {
+        this.game = 'RUNNING';
+        this.fox = fox;
+        this.hound = hound;
         this.grid = new Grid(8, 8);
-        this.board = new Board(board);
+        this.board = new Board(this, board, menu);
         this.grid.setHounds();
         this.grid.setFox(2);
         this.turn = 'fox';
         this.currentState = new State(this.grid, this.turn);
         this.board.draw(this.currentState);
+        if (this[this.turn] === 'COMPUTER') {
+            this.next();
+        }
     }
 
-    next() {
-        let state = this.currentState.getNextMove();
-        this.currentState = state;
+    next(fromNode, toNode) {
+        // if turn is computer
+        let state;
+        if (this[this.turn] === 'COMPUTER') {
+            state = this.currentState.getNextMove();
+            this.currentState = state;
+        } else {
+            if (this.turn === fromNode.animal) {
+                // Creating new state
+                let newGrid = this.currentState.grid.clone();
+                let turn = this.turn === 'fox' ? 'hound' : 'fox';
+                newGrid.moveNode(fromNode, toNode);
+                state = new State(newGrid, turn);
+                this.currentState = state;
+            }
+        }
+
+        if (this.foxWon()) {
+            this.game = 'FOX_WON';
+        }
+        if (this.houndWon()) {
+            this.game = 'HOUND_WON'
+        }
         this.turn = state.turn;
         this.board.draw(this.currentState);
+
+        if (this[this.turn] === 'COMPUTER') {
+            this.next();
+        }
     }
 
     // Check if fox has reached endNodes;
-    checkWon() {
+    foxWon() {
         let fox = this.currentState.grid.getFox();
         return fox.y === 0;
     }
 
     // Check if fox has no neighbours left
-    checkLose() {
+    houndWon() {
         let fox = this.currentState.grid.getFox();
         if (!this.currentState.grid.getNeighbors(fox).length) {
             return true;
@@ -45,8 +77,10 @@ class Engine {
 }
 
 class Board {
-    constructor(boardElement) {
+    constructor(engine, boardElement, menuElement) {
+        this.engine = engine;
         this.element = boardElement;
+        this.menu = menuElement;
     }
 
     draw (state) {
@@ -64,17 +98,18 @@ class Board {
                     animalElement.className = grid[y][x].animal;
                     animalElement.dataset.x = x;
                     animalElement.dataset.y = y;
-                    animalElement.onclick = function(item) {
-                        //engine.selectAnimal()
-                        //this.selectAnimal();
-                        let x = item.path[0].dataset.x,
-                            y = item.path[0].dataset.y;
-                        selectAnimal(x, y);
-                    };
+                    animalElement.addEventListener('click', function (element) {
+                        engine.board.selectAnimal(element.path[0].dataset.x, element.path[0].dataset.y);
+                    });
 
                     this.element.appendChild(animalElement);
                 }
             }
+        }
+
+        let selectElements = this.menu.getElementsByClassName('disabled-running');
+        for (let e = 0;  e < selectElements.length; e++) {
+            selectElements[e].disabled = this.engine.game === "RUNNING";
         }
     }
 
@@ -89,7 +124,44 @@ class Board {
     }
 
     selectAnimal(x, y) {
+        let grid = this.engine.currentState.grid,
+            node = grid.getNode(x, y);
+        // If its the animal turn and the selected player is HUMAN;
+        if (this.engine.turn === node.animal && this.engine[node.animal] === 'HUMAN') {
+            this.clearPossibleMoves();
+            let neighbours = grid.getNeighbors(node);
+            for (let n = 0; n < neighbours.length; n++) {
+                this.drawPossibleMove(neighbours[n], node)
+            }
+        }
+    }
 
+    drawPossibleMove(node, animal) {
+        let moveElement = document.createElement('div');
+        moveElement.style = 'left: ' + (node.x * 75) + 'px; top: ' + (node.y * 75) + 'px;';
+        moveElement.className = 'move';
+        moveElement.dataset.animalx = animal.x;
+        moveElement.dataset.animaly = animal.y;
+        moveElement.dataset.x = node.x;
+        moveElement.dataset.y = node.y;
+        moveElement.addEventListener('click', function (element) {
+            engine.board.selectMove(element.path[0].dataset.x, element.path[0].dataset.y, element.path[0].dataset.animalx, element.path[0].dataset.animaly);
+        });
+        this.element.appendChild(moveElement);
+    }
+
+    clearPossibleMoves() {
+        let elements = this.element.getElementsByClassName('move');
+        while(elements.length > 0){
+            elements[0].parentNode.removeChild(elements[0]);
+        }
+    }
+
+    selectMove(x, y, animalX, animalY) {
+        this.clearPossibleMoves();
+        let toNode = this.engine.currentState.grid.getNode(x, y);
+        let fromNode = this.engine.currentState.grid.getNode(animalX, animalY);
+        this.engine.next(fromNode, toNode)
     }
 }
 
@@ -252,7 +324,7 @@ class State {
         let possibleMoves = this.getPossibleStates();
         for (let i = 0; i < possibleMoves.length; i++) {
             let tree = {options: [], maximizingPlayer: null, chosenValue: null, depth: null, state: null};
-            let value = State.minimax(possibleMoves[i], 2, !maximizingPlayer, tree);
+            let value = State.minimax(possibleMoves[i], 3, !maximizingPlayer, tree);
             allMoveValues.push({state: possibleMoves[i], value: value, tree: tree});
             if ((value > moveValues.value && maximizingPlayer) || (moveValues.value > value && !maximizingPlayer)) {
                 moveValues = {value: value, state: [possibleMoves[i]]};
@@ -260,7 +332,6 @@ class State {
                 moveValues.state.push(possibleMoves[i]);
             }
         }
-
         return moveValues.state[Math.floor(Math.random() * moveValues.state.length)];
     }
 

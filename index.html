@@ -8,23 +8,23 @@
 </head>
 <body>
 	<div class="board" id="board"></div>
-	<div class="menu">
+	<div class="menu" id="menu">
 		<section>
 			<label for="fox-player">Fox</label>
-			<select id="fox-player">
+			<select id="fox-player" class="disabled-running">
 				<option value="COMPUTER">Computer</option>
-				<option value="HUMAN">Human</option>
+				<option value="HUMAN" selected="selected">Human</option>
 			</select>
 		</section>
 		<section>
 			<label for="hounds-player">Hounds</label>
-			<select id="hounds-player">
+			<select id="hounds-player" class="disabled-running">
 				<option value="COMPUTER">Computer</option>
 				<option value="HUMAN">Human</option>
 			</select>
 		</section>
-		<button onclick="newGame()">New game</button>
-		<button onclick="next()">Next</button>
+		<button onclick="newGame()" class="disabled-running">New game</button>
+		<button onclick="stop()">Stop</button>
 	</div>
 	<script src="game.js"></script>
 </body>

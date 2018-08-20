@@ -32,6 +32,14 @@ body {
     background-color: red;
 }
 
+.board > .move {
+    height: 60px;
+    width: 60px;
+    position: absolute;
+    background-color: yellow;
+    cursor: pointer;
+}
+
 .board > .selected {
     filter: grayscale(100%);
 }
