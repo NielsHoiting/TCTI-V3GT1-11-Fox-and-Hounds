@@ -360,6 +360,7 @@ class PathFinder {
                     path.push(node);
                     node = node.parent;
                 }
+                path.push(node);
                 return path;
             }
 
