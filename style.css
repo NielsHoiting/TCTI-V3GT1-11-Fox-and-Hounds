@@ -25,6 +25,13 @@ body {
     position: absolute;
 }
 
+.board > .path {
+    height: 50px;
+    width: 50px;
+    position: absolute;
+    background-color: red;
+}
+
 .board > .selected {
     filter: grayscale(100%);
 }

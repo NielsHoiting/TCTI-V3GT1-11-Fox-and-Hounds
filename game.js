@@ -8,7 +8,6 @@ function newGame() {
 function next() {
     if(!engine.checkWon() || engine.checkLoose()) {
         engine.next();
-        setTimeout(next(), 100);
     }
 }
 
@@ -17,7 +16,7 @@ class Engine {
         this.grid = new Grid(8, 8);
         this.board = new Board(board);
         this.grid.setHounds();
-        this.grid.setFox(0);
+        this.grid.setFox(2);
         this.turn = 'fox';
         this.currentState = new State(this.grid, this.turn);
         this.board.draw(this.currentState);
@@ -37,7 +36,7 @@ class Engine {
     }
 
     // Check if fox has no neighbours left
-    checkLoose() {
+    checkLose() {
         let fox = this.currentState.grid.getFox();
         if (!this.currentState.grid.getNeighbors(fox).length) {
             return true;
@@ -79,8 +78,18 @@ class Board {
         }
     }
 
+    visualizePath(path)  {
+        for (let p = 0; p < path.length; p++) {
+            let node = path[p];
+            let pathElement = document.createElement('div');
+            pathElement.style = 'left: ' + node.x * 75 + 'px; top: ' + node.y * 75 + 'px;';
+            pathElement.className = 'path';
+            this.element.appendChild(pathElement);
+        }
+    }
+
     selectAnimal(x, y) {
-        console.log(state, x, y);
+
     }
 }
 
@@ -235,31 +244,24 @@ class State {
     }
 
     getNextMove() {
+        // We wanna have the highest possible value when turn is to 'hound'
+        let maximizingPlayer = this.turn === 'hound';
+        let moveValues = {value: maximizingPlayer ? -Infinity : Infinity, state: []};
+        let allMoveValues = [];
+
         let possibleMoves = this.getPossibleStates();
-        let bestMove = {value: null, state: []};
         for (let i = 0; i < possibleMoves.length; i++) {
-            //TODO: simplify
-            if (this.turn === 'hound') {
-                let value = State.getValue(possibleMoves[i], 0, 4);
-                if (!bestMove.value || value > bestMove.value) {
-                    bestMove.value = value;
-                    bestMove.state = [possibleMoves[i]];
-                }
-                if (bestMove.value === value) {
-                    bestMove.state.push(possibleMoves[i]);
-                }
-            } else {
-                let value = State.getValue(possibleMoves[i], 0, 4);
-                if (!bestMove.value || value < bestMove.value) {
-                    bestMove.value = value;
-                    bestMove.state.push(possibleMoves[i]);
-                }
-                if (bestMove.value === value) {
-                    bestMove.state.push(possibleMoves[i]);
-                }
+            let tree = {options: [], maximizingPlayer: null, chosenValue: null, depth: null, state: null};
+            let value = State.minimax(possibleMoves[i], 2, !maximizingPlayer, tree);
+            allMoveValues.push({state: possibleMoves[i], value: value, tree: tree});
+            if ((value > moveValues.value && maximizingPlayer) || (moveValues.value > value && !maximizingPlayer)) {
+                moveValues = {value: value, state: [possibleMoves[i]]};
+            } else if(moveValues.value === value) {
+                moveValues.state.push(possibleMoves[i]);
             }
         }
-        return bestMove.state[Math.floor(Math.random() * bestMove.state.length)];
+
+        return moveValues.state[Math.floor(Math.random() * moveValues.state.length)];
     }
 
     getPossibleStates() {
@@ -271,56 +273,65 @@ class State {
             for (let j = 0; j < neighbours.length; j++) {
                 let clonedGrid = this.grid.clone();
                 clonedGrid.moveNode(nodes[i], neighbours[j]);
-                let state = new State(clonedGrid);
-                state.turn = this.turn === 'fox' ? 'hound' : 'fox';
+                let state = new State(clonedGrid, this.turn === 'fox' ? 'hound' : 'fox');
                 states.push(state);
             }
         }
         return states;
     }
 
-    static getValue(state, depth, maxDepth) {
-        //When max depth is reached we wanna calculate the min/max value for each end state.
-        if (depth === maxDepth) {
-            // TODO: use all finish nodes for calc.
-            // TODO: check if we should give lowest or highest value back of all nodes.
-            let value = state.turn = 'hound' ? -Infinity : Infinity;
-            let endNode = state.grid.getNode(1, 0);
-
-            let path = PathFinder.aStar(state.grid.fox, endNode, state.grid);
-
-            if (path.length) {
-                return path.length;
-            } else {
-                //TODO: always infinty? or do we need -Infinity?
-                return Infinity;
+    static minimax(state, depth, maximizingPlayer, tree) {
+        if (depth === 0) {
+            // TODO: change heuristic to when fox is above y go in defence mode.
+            // Looking at shortest path lengths will only defend, and make it impossible for fox to win
+            let pathLengths = [Infinity],
+                path,
+                i;
+            for (i = 1; i < 8; i+=2) {
+                path = PathFinder.aStar(state.grid.getFox(), state.grid.getNode(i, 0), state.grid);
+                if (path.length > 0) {
+                    pathLengths.push(path.length);
+                    tree.options.push(path.length);
+                }
             }
+            tree.chosenValue = Math.min.apply(Math, pathLengths);
+            tree.state = state;
+            tree.depth = depth;
+            tree.turn = state.turn;
+            return Math.min.apply(Math, pathLengths);
         }
 
-        // if turn is hound we wanna maximize
-        if (state.turn === 'hound') {
-            return State.getMaxValue(state, depth, maxDepth);
+        let value, states;
+        if (maximizingPlayer) {
+            value = -Infinity;
+            states = state.getPossibleStates();
+            for (let i = 0; i < states.length; i++) {
+                if(tree.options[i] === undefined) {
+                    tree.options[i] = {options: [], maximizingPlayer: null, chosenValue: null, depth: null, state: null};
+                }
+                value = Math.max(value, State.minimax(states[i], depth - 1, false, tree.options[i]));
+            }
+            tree.maximizingPlayer = maximizingPlayer;
+            tree.chosenValue = value;
+            tree.state = state;
+            tree.depth = depth;
+            tree.turn = state.turn;
         } else {
-            return State.getMinValue(state, depth, maxDepth);
-        }
-    }
+            tree.maximizingPlayer = maximizingPlayer;
+            value = Infinity;
+            states = state.getPossibleStates();
+            for (let i = 0; i < states.length; i++) {
+                if(tree.options[i] === undefined) {
+                    tree.options[i] = {options: [], maximizingPlayer: null, chosenValue: null, depth: null, state: null};
+                }
+                value = Math.min(value, State.minimax(states[i], depth - 1, true, tree.options[i]));
+            }
+            tree.maximizingPlayer = maximizingPlayer;
+            tree.chosenValue = value;
+            tree.state = state;
+            tree.depth = depth;
+            tree.turn = state.turn;
 
-    static getMaxValue(state, dept, maxDepth) {
-        let possibleStates = state.getPossibleStates(state.turn);
-        let value = -Infinity;
-        for (let i = 0; i < possibleStates.length; i++) {
-            possibleStates[i].turn = state.turn === 'fox' ? 'hound' : 'fox';
-            value = Math.max(value, State.getValue(possibleStates[i], dept + 1, maxDepth));
-        }
-        return value;
-    }
-
-    static getMinValue(state, dept, maxDepth) {
-        let possibleStates = state.getPossibleStates(state.turn);
-        let value = -Infinity;
-        for (let i = 0; i < possibleStates.length; i++) {
-            possibleStates[i].turn = state.turn === 'fox' ? 'hound' : 'fox';
-            value = Math.min(value, State.getValue(possibleStates[i], dept + 1, maxDepth));
         }
         return value;
     }
@@ -339,7 +350,6 @@ class PathFinder {
         let clonedGrid = grid.clone();
         let openList = [],
             node;
-        
         // Distance from start
         startNode.g = 0;
         // Distance from start plus estimated distance to end;
