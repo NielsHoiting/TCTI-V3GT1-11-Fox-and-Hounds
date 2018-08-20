@@ -338,60 +338,63 @@ class PathFinder {
     static aStar(startNode, endNode, grid) {
         let clonedGrid = grid.clone();
         let openList = [],
-            node,
-            neighbours,
-            i, neighbour, a, b, ng;
-
+            node;
+        
+        // Distance from start
+        startNode.g = 0;
+        // Distance from start plus estimated distance to end;
+        startNode.f = 0;
+        startNode.opened = true;
         openList.push(startNode);
 
         while (openList.length) {
+            // Getting the node that has the lowest estimated path from the openList
             node = openList.pop();
             node.closed = true;
 
-            node.g = 0;
-            node.f = 0;
+            let neighbours = clonedGrid.getNeighbors(node);
 
             if (node.x === endNode.x && node.y === endNode.y) {
                 let path = [];
-                while (node.parent && node !== startNode) {
-                    node = node.parent;
+                while(node.parent) {
                     path.push(node);
-                }
-
-                if (path[0] === undefined  || (path[0].x !== endNode.x || path[0].y !== endNode.y)) {
-                    path.unshift(endNode);
+                    node = node.parent;
                 }
                 return path;
             }
 
-            neighbours = clonedGrid.getNeighbors(node);
-
-            for (i = 0; i < neighbours.length; i++) {
-                // neighbour g
-                neighbour = neighbours[i];
-                a = neighbour.x - node.x;
-                b = neighbour.y - node.y;
-                ng = node.g + Math.sqrt(a * a + b * b);
-
-                if (!neighbour.opened || ng < neighbour.g) {
-                    neighbour.g = ng;
-                    neighbour.h = manhattanDistance(neighbour, endNode);
-                    neighbour.f = neighbour.g + neighbour.h;
+            for (let n = 0; n < neighbours.length; n++) {
+                let neighbour = neighbours[n];
+                if (neighbour.closed) {
+                    continue;
+                }
+                // The distance of this from the start of this neighbour is the current node + 1.
+                let g = node.g + 1;
+                // If this neighbour has not been opened this g score will be the best we found yet. OR
+                // this node is already opened so check if the new path is faster than the old.
+                if (!neighbour.opened || g < neighbour.g) {
+                    // In both cases we wanna set the current node as parent. Because its the fastest way to get to this neighbour.
                     neighbour.parent = node;
-                    if (!neighbour.opened) {
+                    // Set or update to the fastest distance from startNode to neighbour we have seen so far.
+                    neighbour.g = g;
+                    // Set the estimated distance to the end node for calculating the f value.
+                    neighbour.h = manhattanDistance(neighbour, endNode);
+                    // f is distance from start plus estimated distance to end
+                    neighbour.f = neighbour.g + neighbour.h;
+
+                    if(!neighbour.opened) {
+                        openList.push(neighbour);
                         neighbour.opened = true;
-                        openList.push(neighbour)
                     } else {
-                        replaceOpenList(neighbour)
+                        replaceOpenList(neighbour);
                     }
                 }
             }
 
-            // Sorting list
+            // Sorting list so the lowest f is up.
             openList.sort(function (a, b) {
-                return a.f - b.f
+                return b.f - a.f
             });
-
         }
 
         function replaceOpenList(node) {
