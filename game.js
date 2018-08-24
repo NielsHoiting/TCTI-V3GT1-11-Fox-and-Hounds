@@ -315,6 +315,15 @@ class State {
         this.turn = turn;
     }
 
+    getWinner() {
+        if (this.grid.getFox().y === 0) {
+            return 'fox';
+        } else if (!this.grid.getNeighbors(this.grid.getFox()).length) {
+            return 'hound';
+        }
+    }
+
+
     getNextMove() {
         // We wanna have the highest possible value when turn is to 'hound'
         let maximizingPlayer = this.turn === 'hound';
@@ -324,7 +333,7 @@ class State {
         let possibleMoves = this.getPossibleStates();
         for (let i = 0; i < possibleMoves.length; i++) {
             let tree = {options: [], maximizingPlayer: null, chosenValue: null, depth: null, state: null};
-            let value = State.minimax(possibleMoves[i], 3, !maximizingPlayer, tree);
+            let value = State.minimax(possibleMoves[i], 4, !maximizingPlayer, tree);
             allMoveValues.push({state: possibleMoves[i], value: value, tree: tree});
             if ((value > moveValues.value && maximizingPlayer) || (moveValues.value > value && !maximizingPlayer)) {
                 moveValues = {value: value, state: [possibleMoves[i]]};
@@ -332,6 +341,7 @@ class State {
                 moveValues.state.push(possibleMoves[i]);
             }
         }
+        console.log(allMoveValues);
         return moveValues.state[Math.floor(Math.random() * moveValues.state.length)];
     }
 
@@ -352,6 +362,13 @@ class State {
     }
 
     static minimax(state, depth, maximizingPlayer, tree) {
+        let winner = state.getWinner();
+        if (winner === 'fox') {
+            return -Infinity;
+        } else if (winner === 'hound') {
+            return Infinity;
+        }
+
         if (depth === 0) {
             // TODO: change heuristic to when fox is above y go in defence mode.
             // Looking at shortest path lengths will only defend, and make it impossible for fox to win
