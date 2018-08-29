@@ -382,6 +382,7 @@ class State {
                     tree.options.push(path.length);
                 }
             }
+            // De heuristiek waarde is gebaseert op de afstand tussen de fox en de bovenste 4 vakken. deze is berekent met aStar
             tree.chosenValue = Math.min.apply(Math, pathLengths);
             tree.state = state;
             tree.depth = depth;
@@ -391,7 +392,7 @@ class State {
 
         let value, states;
         if (maximizingPlayer) {
-            value = -Infinity;
+            value = -1000;
             states = state.getPossibleStates();
             for (let i = 0; i < states.length; i++) {
                 if(tree.options[i] === undefined) {
@@ -406,7 +407,7 @@ class State {
             tree.turn = state.turn;
         } else {
             tree.maximizingPlayer = maximizingPlayer;
-            value = Infinity;
+            value = 1000;
             states = state.getPossibleStates();
             for (let i = 0; i < states.length; i++) {
                 if(tree.options[i] === undefined) {
